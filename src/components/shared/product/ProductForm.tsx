@@ -89,7 +89,7 @@ const ProductForm = ({ onSubmit, onChangeImageUrl }: ProductFormProps) => {
         name="categoryId"
         render={({ field }) => (
           <FormItem>
-            <FormLabel>Price</FormLabel>
+            <FormLabel>Category</FormLabel>
             <FormControl>
               <Select
                 value={field.value}

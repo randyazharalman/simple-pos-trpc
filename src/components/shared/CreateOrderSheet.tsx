@@ -21,20 +21,22 @@ import {
   SheetTitle,
 } from "../ui/sheet";
 import { PaymentQRCode } from "./PaymentQrCode";
+import { useCartStore } from "@/store/cart";
 
 type OrderItemProps = {
   id: string;
   name: string;
   price: number;
+  imageUrl: string;
   quantity: number;
 };
 
-const OrderItem = ({ id, name, price, quantity }: OrderItemProps) => {
+const OrderItem = ({ id, name, price,imageUrl, quantity }: OrderItemProps) => {
   return (
     <div className="flex gap-3" key={id}>
       <div className="relative aspect-square h-20 shrink-0 overflow-hidden rounded-xl">
         <Image
-          src={PRODUCTS.find((p) => p.id === id)?.image ?? ""}
+          src={imageUrl}
           alt={name}
           fill
           unoptimized
@@ -79,12 +81,17 @@ export const CreateOrderSheet = ({
   open,
   onOpenChange,
 }: CreateOrderSheetProps) => {
+  const cartStore = useCartStore();
+
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [paymentInfoLoading, setPaymentInfoLoading] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
 
-  const subtotal = 100000;
-  const tax = useMemo(() => subtotal * 0.17, [subtotal]);
+  // const subtotal = 1000;
+  const subtotal = cartStore.items.reduce((a, b) => {
+    return a + b.price * b.quantity
+  }, 0);
+  const tax = useMemo(() => subtotal * 0.1, [subtotal]);
   const grandTotal = useMemo(() => subtotal + tax, [subtotal, tax]);
 
   const handleCreateOrder = () => {
@@ -115,6 +122,16 @@ export const CreateOrderSheet = ({
             <h1 className="text-xl font-medium">Order Items</h1>
             <div className="flex flex-col gap-6">
               {/* Map order items here */}
+              {cartStore.items.map((item) => {
+                return <OrderItem 
+                key={item.productId} 
+                id={item.productId}
+                name={item.productName}
+                imageUrl={item.imageUrl}
+                price={item.price}
+                quantity={item.quantity}
+                 />;
+              })}
             </div>
           </div>
 

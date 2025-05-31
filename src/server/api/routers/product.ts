@@ -54,22 +54,85 @@ export const productRouter = createTRPCRouter({
       return newProduct;
     }),
 
-  crateProductImageUploadSignedUrl: protectedProcedure.mutation(
-    async () => {
-      const { data, error } = await supabaseAdmin.storage
-        .from(Bucket.ProductImages)
-        .createSignedUploadUrl(`${Date.now()}.jpeg`);
+  crateProductImageUploadSignedUrl: protectedProcedure.mutation(async () => {
+    const { data, error } = await supabaseAdmin.storage
+      .from(Bucket.ProductImages)
+      .createSignedUploadUrl(`${Date.now()}.jpeg`);
 
-        if(error) {
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: error.message
-          })
-        }
+    if (error) {
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: error.message,
+      });
+    }
 
-        return data;
+    return data;
+  }),
+  updateProduct: protectedProcedure
+  .input(
+    z.object({
+        productId: z.string(),
+        productName: z.string().min(3),
+        imageUrl: z.string().url(),
+        price: z.coerce.number().min(1000),
+        categoryId: z.string(),
+      }),
+  )
+  .mutation(async ({ ctx, input }) => {
+  const { db } = ctx;
+
+  // 1. Ambil produk lama termasuk imageUrl
+  const existingProduct = await db.product.findUnique({
+    where: { id: input.productId },
+    select: {
+      imageUrl: true,
     },
-  ),
+  });
+
+  if (!existingProduct) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Produk tidak ditemukan",
+    });
+  }
+
+  // 2. Cek apakah image-nya diganti
+  const isImageChanged = input.imageUrl && input.imageUrl !== existingProduct.imageUrl;
+
+  if (isImageChanged && existingProduct.imageUrl) {
+    const oldPath = existingProduct.imageUrl.split("/storage/v1/object/public/")[1];
+
+    if (oldPath) {
+      const { error } = await supabaseAdmin.storage
+        .from(Bucket.ProductImages)
+        .remove([oldPath]);
+
+      if (error) {
+        console.error("Gagal hapus gambar lama dari Supabase:", error.message);
+      }
+    }
+  }
+
+  // 3. Update produk
+  const updatedProduct = await db.product.update({
+    where: { id: input.productId },
+    data: {
+      productName: input.productName,
+      price: input.price,
+      imageUrl: input.imageUrl,
+      categoryId: input.categoryId,
+    },
+    select: {
+      id: true,
+      productName: true,
+      price: true,
+      imageUrl: true,
+      category: true,
+    },
+  });
+
+  return updatedProduct;
+}),
   deleteProductById: protectedProcedure
     .input(
       z.object({
@@ -79,11 +142,44 @@ export const productRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const { db } = ctx;
 
+      const product = await db.product.findUnique({
+        where: {
+          id: input.productId,
+        },
+        select: {
+          id: true,
+          imageUrl: true,
+        },
+      });
+
+      if (!product) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Produk tidak ditemukan",
+        });
+      }
+
+      console.log(product.imageUrl);
+
       const deleteProduct = await db.product.delete({
         where: {
           id: input.productId,
         },
       });
+      if (product.imageUrl) {
+        const path = product.imageUrl.split("/storage/v1/object/public/")[1];
+
+        if (path) {
+          const { error } = await supabaseAdmin.storage
+            .from(Bucket.ProductImages)
+            .remove([path]);
+
+          if (error) {
+            alert("Gagal hapus gambar dari Supabase:" + error.message);
+          }
+        }
+      }
+
       return deleteProduct;
     }),
 });
