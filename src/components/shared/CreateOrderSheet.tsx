@@ -22,6 +22,7 @@ import {
 } from "../ui/sheet";
 import { PaymentQRCode } from "./PaymentQrCode";
 import { useCartStore } from "@/store/cart";
+import { api } from "@/utils/api";
 
 type OrderItemProps = {
   id: string;
@@ -31,7 +32,7 @@ type OrderItemProps = {
   quantity: number;
 };
 
-const OrderItem = ({ id, name, price,imageUrl, quantity }: OrderItemProps) => {
+const OrderItem = ({ id, name, price, imageUrl, quantity }: OrderItemProps) => {
   return (
     <div className="flex gap-3" key={id}>
       <div className="relative aspect-square h-20 shrink-0 overflow-hidden rounded-xl">
@@ -85,26 +86,64 @@ export const CreateOrderSheet = ({
 
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [paymentInfoLoading, setPaymentInfoLoading] = useState(false);
-  const [paymentSuccess, setPaymentSuccess] = useState(false);
 
   // const subtotal = 1000;
   const subtotal = cartStore.items.reduce((a, b) => {
-    return a + b.price * b.quantity
+    return a + b.price * b.quantity;
   }, 0);
   const tax = useMemo(() => subtotal * 0.1, [subtotal]);
   const grandTotal = useMemo(() => subtotal + tax, [subtotal, tax]);
 
-  const handleCreateOrder = () => {
-    setPaymentDialogOpen(true);
-    setPaymentInfoLoading(true);
+  const { mutate: createOrder, data: createOrderResponse } =
+    api.order.createOrder.useMutation({
+      onSuccess: () => {
+        alert("Create Order");
 
-    setTimeout(() => {
-      setPaymentInfoLoading(false);
-    }, 3000);
+        setPaymentDialogOpen(true);
+      },
+    });
+
+  const { mutate: simulatePayment } = api.order.simulatePayment.useMutation({
+    onSuccess: () => {
+      alert("Simulate Payment");
+    },
+  });
+
+  const {
+    mutate: checkOrderPaymentStatus,
+    data: orderPaid,
+    isPending: checkOrderPaymentStatusIsPending,
+  } = api.order.checkOrderPaymentStatus.useMutation();
+
+  const handleCreateOrder = () => {
+    createOrder({
+      orderItems: cartStore.items.map((item) => {
+        return {
+          productId: item.productId,
+          quantity: item.quantity,
+        };
+      }),
+    });
+    // setPaymentDialogOpen(true);
+    // setPaymentInfoLoading(true);
+
+    // setTimeout(() => {
+    //   setPaymentInfoLoading(false);
+    // }, 3000);
   };
 
   const handleRefresh = () => {
-    setPaymentSuccess(true);
+    if (!createOrderResponse) return;
+    checkOrderPaymentStatus({
+      orderId: createOrderResponse?.order.id,
+    });
+  };
+
+  const handleSimulatePayment = () => {
+    if (!createOrderResponse) return;
+    simulatePayment({
+      orderId: createOrderResponse?.order.id,
+    });
   };
 
   return (
@@ -123,14 +162,16 @@ export const CreateOrderSheet = ({
             <div className="flex flex-col gap-6">
               {/* Map order items here */}
               {cartStore.items.map((item) => {
-                return <OrderItem 
-                key={item.productId} 
-                id={item.productId}
-                name={item.productName}
-                imageUrl={item.imageUrl}
-                price={item.price}
-                quantity={item.quantity}
-                 />;
+                return (
+                  <OrderItem
+                    key={item.productId}
+                    id={item.productId}
+                    name={item.productName}
+                    imageUrl={item.imageUrl}
+                    price={item.price}
+                    quantity={item.quantity}
+                  />
+                );
               })}
             </div>
           </div>
@@ -176,21 +217,35 @@ export const CreateOrderSheet = ({
               </div>
             ) : (
               <>
-                <Button variant="link" onClick={handleRefresh}>
-                  Refresh
+                <Button variant="link" onClick={handleRefresh} disabled={checkOrderPaymentStatusIsPending}>
+                  {checkOrderPaymentStatusIsPending ? "Refreshing...": "Refresh"}
                 </Button>
 
-                {!paymentSuccess ? (
-                  <PaymentQRCode qrString="qr-string" />
+                {!orderPaid ? (
+                  <PaymentQRCode
+                    qrString={createOrderResponse?.qrString ?? ""}
+                  />
                 ) : (
                   <CheckCircle2 className="size-80 text-green-500" />
                 )}
 
-                <p className="text-3xl font-medium">{toRupiah(grandTotal)}</p>
+                <p className="text-3xl font-medium">
+                  {toRupiah(createOrderResponse?.order.grandTotal ?? 0)}
+                </p>
 
                 <p className="text-muted-foreground text-sm">
-                  Transaction ID: 1234567890
+                  Transaction ID: {createOrderResponse?.order.id}
                 </p>
+                {!orderPaid && (
+                <Button
+                  variant={"default"}
+                  onClick={handleSimulatePayment}
+                  className="bg-blue-500 hover:bg-blue-600"
+                >
+                  Simulate Payment
+                </Button>
+
+                )}
               </>
             )}
           </div>

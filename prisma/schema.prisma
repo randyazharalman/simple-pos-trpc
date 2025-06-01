@@ -2,67 +2,74 @@
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
 generator client {
-    provider = "prisma-client-js"
+  provider = "prisma-client-js"
 }
 
 datasource db {
-    provider = "postgresql"
-    directUrl = env("DIRECT_URL") // untuk sync ke db supabase
-    url      = env("DATABASE_URL") // untuk query
+  provider  = "postgresql"
+  directUrl = env("DIRECT_URL") // untuk sync ke db supabase
+  url       = env("DATABASE_URL") // untuk query
 }
 
-
 model Category {
-    id String @id @default(uuid())
+  id String @id @default(uuid())
 
-    name String
-    productCount  Int @default(0)
+  name         String
+  productCount Int    @default(0)
 
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-    product Product[]
-    // createdBy String
-
+  product Product[]
+  // createdBy String
 }
 
 model Product {
-    id String @id @default(uuid())
+  id String @id @default(uuid())
 
-    productName String
-    price Int 
-    imageUrl String?
+  productName String
+  price       Int
+  imageUrl    String?
 
-    categoryId  String
-    category Category  @relation(fields: [categoryId], references: [id])
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
 
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  orderItems OrderItem[]
 }
 
 model Order {
-    id String @id @default(uuid())
+  id String @id @default(uuid())
 
-    subtotal Int
-    tax Int
-    grandTotal Int
+  subtotal   Int
+  tax        Int
+  grandTotal Int
 
+  // payment gateway fields
+  externalTransactionId String?
+  paymentMethodId       String?
 
+  status OrderStatus @default(AWAITING_PAYMENT)
+  paidAt DateTime?
 
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  orderItems OrderItem[]
 }
 
-enum orderStatus {
-    AWAITING_PAYMENT
-    PROCESSING
-    DONE
+enum OrderStatus {
+  AWAITING_PAYMENT
+  PROCESSING
+  DONE
 }
 
-// model OrderItem {
-//     id String @id @default(uuid())
-//     productId String
-//     orderId String
-//     product Product @relation(fields: [productId], references: [id])
-
-//     price Int
-//     quantity Int
-// }
+model OrderItem {
+  id        String  @id @default(uuid())
+  productId String
+  orderId   String
+  product   Product @relation(fields: [productId], references: [id])
+  order     Order   @relation(fields: [orderId], references: [id])
+  price     Int
+  quantity  Int
+}
