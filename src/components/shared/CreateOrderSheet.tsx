@@ -2,7 +2,7 @@ import { Button } from "../ui/button";
 
 import { PRODUCTS } from "@/data/mock";
 import { toRupiah } from "@/utils/toRupiah";
-import { CheckCircle2, Minus, Plus } from "lucide-react";
+import { CheckCircle2, Minus, Plus, RefreshCcw } from "lucide-react";
 import Image from "next/image";
 import { useMemo, useState } from "react";
 import {
@@ -23,6 +23,8 @@ import {
 import { PaymentQRCode } from "./PaymentQrCode";
 import { useCartStore } from "@/store/cart";
 import { api } from "@/utils/api";
+import { OrderStatusWatcher } from "./OrderStatusWatcher";
+import { toast } from "sonner";
 
 type OrderItemProps = {
   id: string;
@@ -30,9 +32,11 @@ type OrderItemProps = {
   price: number;
   imageUrl: string;
   quantity: number;
+  handleIncrementCartItem: (productId: string) => void;
+  handleDecrementCartItem: (productId: string) => void;
 };
 
-const OrderItem = ({ id, name, price, imageUrl, quantity }: OrderItemProps) => {
+const OrderItem = ({ id, name, price, imageUrl, quantity, handleIncrementCartItem, handleDecrementCartItem }: OrderItemProps) => {
   return (
     <div className="flex gap-3" key={id}>
       <div className="relative aspect-square h-20 shrink-0 overflow-hidden rounded-xl">
@@ -57,13 +61,13 @@ const OrderItem = ({ id, name, price, imageUrl, quantity }: OrderItemProps) => {
           <p className="font-medium">{toRupiah(quantity * price)}</p>
 
           <div className="flex items-center gap-3">
-            <button className="bg-secondary hover:bg-secondary/80 cursor-pointer rounded-full p-1">
+            <button onClick={()=>handleDecrementCartItem(id)}  className="bg-secondary hover:bg-secondary/80 cursor-pointer rounded-full p-1">
               <Minus className="h-4 w-4" />
             </button>
 
-            <span className="text-sm">{quantity}</span>
+            <span className="text-sm">{quantity>0 ? quantity : 0}</span>
 
-            <button className="bg-secondary hover:bg-secondary/80 cursor-pointer rounded-full p-1">
+            <button onClick={()=>handleIncrementCartItem(id)} className="bg-secondary hover:bg-secondary/80 cursor-pointer rounded-full p-1">
               <Plus className="h-4 w-4" />
             </button>
           </div>
@@ -97,15 +101,15 @@ export const CreateOrderSheet = ({
   const { mutate: createOrder, data: createOrderResponse } =
     api.order.createOrder.useMutation({
       onSuccess: () => {
-        alert("Create Order");
+        toast("Create Order");
 
         setPaymentDialogOpen(true);
       },
     });
 
-  const { mutate: simulatePayment } = api.order.simulatePayment.useMutation({
+  const { mutateAsync: simulatePayment } = api.order.simulatePayment.useMutation({
     onSuccess: () => {
-      alert("Simulate Payment");
+      toast("Simulate Payment");
     },
   });
 
@@ -113,8 +117,40 @@ export const CreateOrderSheet = ({
     mutate: checkOrderPaymentStatus,
     data: orderPaid,
     isPending: checkOrderPaymentStatusIsPending,
-  } = api.order.checkOrderPaymentStatus.useMutation();
+    reset: resetCheckOrderPaymentStatus,
+    isSuccess: checkOrderPaymentStatusIsSuccess
+  } = api.order.checkOrderPaymentStatus.useMutation({
+    onSuccess: (orderPaid) => {
+      console.log("Success orderrpaid status:", orderPaid);
+      console.log("Success status:", orderPaid);
+      if(orderPaid) {
+        cartStore.clearCart();
+        return
+      }
+    }
+  });
 
+    const {data: products} = api.product.getProducts.useQuery()
+  
+    const handleAddToCart = (productId: string) => {
+      const productToAdd = products?.find(product => product.id === productId)
+      
+      if(!productToAdd) {
+        toast("Product not found")
+        return
+      }
+      cartStore.addToCart({
+        productId: productId,
+        productName: productToAdd.productName,
+        price: productToAdd.price,
+        imageUrl: productToAdd.imageUrl ?? ""
+      })
+    };
+
+    const handleDecrementCartItem = (productId: string) => {
+      cartStore.decrementCartItem(productId)
+    }
+  
   const handleCreateOrder = () => {
     createOrder({
       orderItems: cartStore.items.map((item) => {
@@ -132,19 +168,35 @@ export const CreateOrderSheet = ({
     // }, 3000);
   };
 
-  const handleRefresh = () => {
+  const handleRefresh = async() => {
     if (!createOrderResponse) return;
     checkOrderPaymentStatus({
       orderId: createOrderResponse?.order.id,
     });
   };
+  
+ const handleSimulatePayment =  async () => {
+  if (!createOrderResponse) return;
 
-  const handleSimulatePayment = () => {
-    if (!createOrderResponse) return;
-    simulatePayment({
-      orderId: createOrderResponse?.order.id,
-    });
-  };
+  await simulatePayment({
+    orderId: createOrderResponse.order.id,
+  });
+  // resetCheckOrderPaymentStatus();
+  
+  checkOrderPaymentStatus({
+    orderId: createOrderResponse?.order.id,
+  });
+  // Baru cek status setelah simulasi pembayaran selesai
+  //  handleRefresh();
+  cartStore.clearCart();
+};
+
+  const handleClosePaymentDialog = async () => {
+    onOpenChange(false);
+    setPaymentDialogOpen(false);
+    await handleRefresh();
+    resetCheckOrderPaymentStatus();
+  }
 
   return (
     <>
@@ -170,6 +222,8 @@ export const CreateOrderSheet = ({
                     imageUrl={item.imageUrl}
                     price={item.price}
                     quantity={item.quantity}
+                    handleIncrementCartItem={handleAddToCart}
+                    handleDecrementCartItem={handleDecrementCartItem}
                   />
                 );
               })}
@@ -208,6 +262,7 @@ export const CreateOrderSheet = ({
         <AlertDialogContent>
           <div className="flex flex-col items-center justify-center gap-4">
             <p className="text-lg font-medium">Finish Payment</p>
+            {/* <OrderStatusWatcher orderId={createOrderResponse?.order.id} /> */}
 
             {paymentInfoLoading ? (
               <div className="flex flex-col items-center justify-center gap-2">
@@ -220,8 +275,7 @@ export const CreateOrderSheet = ({
                 <Button variant="link" onClick={handleRefresh} disabled={checkOrderPaymentStatusIsPending}>
                   {checkOrderPaymentStatusIsPending ? "Refreshing...": "Refresh"}
                 </Button>
-
-                {!orderPaid ? (
+                {!orderPaid && !checkOrderPaymentStatusIsSuccess  ? (
                   <PaymentQRCode
                     qrString={createOrderResponse?.qrString ?? ""}
                   />
@@ -236,7 +290,7 @@ export const CreateOrderSheet = ({
                 <p className="text-muted-foreground text-sm">
                   Transaction ID: {createOrderResponse?.order.id}
                 </p>
-                {!orderPaid && (
+                {!orderPaid && !checkOrderPaymentStatusIsSuccess &&(
                 <Button
                   variant={"default"}
                   onClick={handleSimulatePayment}
@@ -253,9 +307,10 @@ export const CreateOrderSheet = ({
           <AlertDialogFooter>
             <AlertDialogCancel asChild>
               <Button
-                disabled={paymentInfoLoading}
+                disabled={!orderPaid && !checkOrderPaymentStatusIsSuccess}
                 variant="outline"
                 className="w-full"
+                onClick={handleClosePaymentDialog}
               >
                 Done
               </Button>

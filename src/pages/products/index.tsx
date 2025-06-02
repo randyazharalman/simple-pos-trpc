@@ -26,6 +26,7 @@ import { useForm } from "react-hook-form";
 import { productFormSchema, updateProductFormSchema, type ProductFormSchema, type UpdateProductFormSchema, } from "@/forms/product";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Form } from "@/components/ui/form";
+import { toast } from "sonner";
 
 const ProductsPage: NextPageWithLayout = () => {
   const apiUtils = api.useUtils();
@@ -41,7 +42,7 @@ const ProductsPage: NextPageWithLayout = () => {
   const { mutate: createProduct } = api.product.createProduct.useMutation({
     onSuccess: async () => {
       await apiUtils.invalidate();
-      alert("Create product successfully");
+      toast("Create product successfully");
       createProductForm.reset();
       setCreateProductDialogOpen(false);
     },
@@ -50,7 +51,7 @@ const ProductsPage: NextPageWithLayout = () => {
   const {mutate: updateProduct, isPending: isUpdating} = api.product.updateProduct.useMutation({
       onSuccess: async () => {
         await apiUtils.product.getProducts.invalidate();
-        alert("Update Product successfully");
+        toast("Update Product successfully");
         setEditProductDialogOpen(false);
         editProductForm.reset();
       },
@@ -68,7 +69,7 @@ const ProductsPage: NextPageWithLayout = () => {
 
   const handleSubmitCreateProduct = (values: ProductFormSchema) => {
     if (!uploadedCreateProductImageUrl) {
-      alert("Please upload product image first");
+      toast("Please upload product image first");
       return;
     }
     createProduct({
@@ -79,7 +80,7 @@ const ProductsPage: NextPageWithLayout = () => {
 
     const handleSubmitEditProduct = (data: ProductFormSchema) => {
       console.log(data);
-      if (!productToEdit) return alert("No product selected");
+      if (!productToEdit) return toast("No product selected");
       updateProduct({
         ...data,
         productId: productToEdit,

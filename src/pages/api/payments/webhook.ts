@@ -1,4 +1,5 @@
 import { db } from "@/server/db";
+import { OrderStatus } from "@prisma/client";
 import type { NextApiHandler } from "next";
 
 type XenditWebhookBody = {
@@ -52,7 +53,7 @@ const handler: NextApiHandler = async (req, res) => {
     },
     data: {
       paidAt: new Date(),
-      status: "PROCESSING"
+      status: OrderStatus.PROCESSING
     }
   })
 

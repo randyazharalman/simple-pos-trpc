@@ -6,6 +6,7 @@ import type { NextPage } from "next";
 import { type AppProps } from "next/app";
 import { Outfit } from "next/font/google";
 import type { ReactElement, ReactNode } from "react";
+import { Toaster } from "sonner";
 
 const outfit = Outfit({
   subsets: ["latin"],
@@ -26,6 +27,7 @@ const MyApp = ({ Component, pageProps }: AppPropsWithLayout) => {
     <ClerkProvider>
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
         <div className={`${outfit.className}`}>
+          <Toaster position="top-center" />
           {getLayout(<Component {...pageProps} />)}
         </div>
       </ThemeProvider>

@@ -8,14 +8,14 @@ import { CategoryFilterCard } from "@/components/shared/category/CategoryFilterC
 import { CreateOrderSheet } from "@/components/shared/CreateOrderSheet";
 import { ProductMenuCard } from "@/components/shared/product/ProductMenuCard";
 import { Input } from "@/components/ui/input";
-import { CATEGORIES, PRODUCTS } from "@/data/mock";
 import { Search, ShoppingCart } from "lucide-react";
 import type { ReactElement } from "react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import type { NextPageWithLayout } from "../_app";
 import { Button } from "@/components/ui/button";
 import { api } from "@/utils/api";
 import { useCartStore } from "@/store/cart";
+import { toast } from "sonner";
 
 const DashboardPage: NextPageWithLayout = () => {
   const cartStore = useCartStore()
@@ -27,13 +27,24 @@ const DashboardPage: NextPageWithLayout = () => {
     setSelectedCategory(categoryId);
   };
 
-  const {data: products} = api.product.getProducts.useQuery()
+  const {data: products} = api.product.getProducts.useQuery(
+    {
+      categoryId: selectedCategory,
+      productQuery: searchQuery
+    }
+  );
+
+  const { data: categories } = api.category.getCategories.useQuery();
+
+  const totalProducts = categories?.reduce((a, b ) => {
+    return a + b._count.product
+  },0)
 
   const handleAddToCart = (productId: string) => {
     const productToAdd = products?.find(product => product.id === productId)
     
     if(!productToAdd) {
-      alert("Product not found")
+      toast("Product not found")
       return
     }
     cartStore.addToCart({
@@ -44,18 +55,6 @@ const DashboardPage: NextPageWithLayout = () => {
     })
   };
 
-  const filteredProducts = useMemo(() => {
-    return PRODUCTS.filter((product) => {
-      const categoryMatch =
-        selectedCategory === "all" || product.category === selectedCategory;
-
-      const searchMatch = product.name
-        .toLowerCase()
-        .includes(searchQuery.toLowerCase());
-
-      return categoryMatch && searchMatch;
-    });
-  }, [selectedCategory, searchQuery]);
 
   return (
     <>
@@ -94,11 +93,18 @@ const DashboardPage: NextPageWithLayout = () => {
         </div>
 
         <div className="flex space-x-4 overflow-x-auto pb-2">
-          {CATEGORIES.map((category) => (
+          <CategoryFilterCard
+              key={"all"}
+              name={"All"}
+              productCount={totalProducts ?? 0}
+              isSelected={selectedCategory === "all"}
+              onClick={() => handleCategoryClick("all")}
+            />
+          {categories?.map((category) => (
             <CategoryFilterCard
               key={category.id}
               name={category.name}
-              productCount={category.count}
+              productCount={category._count.product}
               isSelected={selectedCategory === category.id}
               onClick={() => handleCategoryClick(category.id)}
             />

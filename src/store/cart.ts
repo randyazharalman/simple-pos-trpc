@@ -13,6 +13,8 @@ type AddToCartItem = Omit<CartItem, "quantity">;
 interface CartState {
   items: CartItem[];
   addToCart: (newItem: AddToCartItem) => void;
+  decrementCartItem: (productId: string) => void;
+  clearCart: () => void;
 }
 
 export const useCartStore = create<CartState>()((set) => ({
@@ -49,4 +51,42 @@ export const useCartStore = create<CartState>()((set) => ({
     });
     // alert(newItem.productName)
   },
+  decrementCartItem: (productId) => {
+  set((state) => {
+    const existingItemIndex = state.items.findIndex(
+      (item) => item.productId === productId
+    );
+
+    // Jika tidak ditemukan, return state tanpa perubahan
+    if (existingItemIndex === -1) return state;
+
+    const items = [...state.items];
+    const item = items[existingItemIndex]!;
+    
+
+    // Jika quantity <= 1 atau 0 => hapus item dari cart 
+    if (item.quantity <= 1) {
+      items.splice(existingItemIndex, 1); // hapus item
+    } else {
+      items[existingItemIndex] = {
+        ...item,
+        quantity: item.quantity - 1,
+      };
+    }
+
+    return {
+      ...state,
+      items,
+    };
+  });
+},
+
+  clearCart: () => {
+    set((state)=> {
+      return {
+        ...state,
+        items: []
+      }
+    })
+  }
 }));

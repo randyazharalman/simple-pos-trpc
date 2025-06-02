@@ -26,6 +26,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import type { NextPageWithLayout } from "../_app";
 import { api } from "@/utils/api";
+import { toast } from "sonner";
 
 const CategoriesPage: NextPageWithLayout = () => {
   const apiUtils = api.useUtils();
@@ -49,7 +50,7 @@ const CategoriesPage: NextPageWithLayout = () => {
   const { mutate: createCategory } = api.category.createCategory.useMutation({
     onSuccess: async () => {
       await apiUtils.category.getCategories.invalidate();
-      alert("Create category successfully");
+      toast("Create category successfully");
       setCreateCategoryDialogOpen(false);
       createCategoryForm.reset();
     },
@@ -59,7 +60,7 @@ const CategoriesPage: NextPageWithLayout = () => {
     api.category.updateCategory.useMutation({
       onSuccess: async () => {
         await apiUtils.category.getCategories.invalidate();
-        alert("Update category successfully");
+        toast("Update category successfully");
         setEditCategoryDialogOpen(false);
         editCategoryForm.reset();
       },
@@ -69,7 +70,7 @@ const CategoriesPage: NextPageWithLayout = () => {
     api.category.deleteCategoryById.useMutation({
       onSuccess: async () => {
         await apiUtils.category.getCategories.invalidate();
-        alert("delete category successfully");
+        toast("delete category successfully");
         setCategoryToDelete(null);
       },
     });
@@ -83,7 +84,7 @@ const CategoriesPage: NextPageWithLayout = () => {
 
   const handleSubmitEditCategory = (data: CategoryFormSchema) => {
     console.log(data);
-    if (!categoryToEdit) return alert("No category selected");
+    if (!categoryToEdit) return toast("No category selected");
     updateCategory({
       name: data.name,
       categoryId: categoryToEdit,
